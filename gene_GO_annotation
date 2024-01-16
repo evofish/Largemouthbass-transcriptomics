@@ -1,0 +1,158 @@
+###Annotation for genes using the ENSMBL datasets and the SwissProt Uniprot
+
+setwd('~/Desktop/large-mouth-bass/LMB-annotation-feb2022/')
+
+oreoref<-read.csv('nile-tilapia-genenames-GOcats.csv', header=T)
+zebraref<-read.csv('zebrafish-gene-GO-annot.csv', header=T)
+colnames(oreoref)
+colnames(oreoref) <- c("Gene_stable_ID","Gene_description", "Gene_name","GO_term_accession","GO_term_name")
+head(oreoref)
+
+zebra_ref2 <- zebraref[, c(1, 5, 4, 2, 3)]
+head(zebra_ref2)
+colnames(zebra_ref2)
+colnames(zebra_ref2) <- c("Gene_stable_ID","Gene_description", "Gene_name","GO_term_accession","GO_term_name")
+
+all_anot<-rbind(oreoref,zebra_ref2) 
+colnames(all_anot) <- c("Gene_stable_ID","Gene_description", "Gene_name","GO_term_accession","GO_term_name")
+head(all_anot)
+ensemb_gene<-all_anot[ , c(1, 3)]
+head(ensemb_gene) #just the gene name for each of the ENSMBL IDs for zebrafish and oreochromis 
+
+nor_oreo<-read.table('north-oreochromis-ref.OUT', header=FALSE, sep='\t')
+nor_zeb<-read.table('north-danio-ref-SingleID.txt', header=FALSE, sep='\t')
+nor_unip<-read.table('north-uniprot.OUT', header=FALSE, sep='\t')
+head(nor_zeb)
+head(nor_oreo)
+head(nor_unip)
+
+all_nor<-rbind(nor_zeb, nor_oreo, nor_unip)
+nrow(all_nor)#901420
+head(all_nor)
+
+flo_oreo<-read.table('florida-tilapia-ref.OUT', header=FALSE, sep='\t')
+flor_zeb<-read.table('florida-zebrafish-ref-SingleID.txt', header=FALSE, sep='\t')
+flor_unip<-read.table('florida-uniprot-.OUT', header=FALSE, sep='\t')
+head(flo_oreo)
+head(flor_zeb)
+head(flor_unip)
+all_flor<-rbind(flor_zeb, flo_oreo, flor_unip)
+nrow(all_flor)#887049
+head(all_flor)
+
+##For genes, remove redundancy by choosing best e-value using dplyr 
+library(dplyr)
+all_nor_sort<-all_nor [order(all_nor$V11,-all_nor$V3),] #this orders everything by e-value in ascending order and % of mapping to reference in descending order. 
+all_nor_filter<-all_nor_sort %>% group_by (all_nor_sort$V1) %>% filter (row_number()==1) %>% as.data.frame() #only use 1 of the ID's, the one with highest mapping and lower evalue
+head(all_nor_filter)
+nrow(all_nor_filter) #80357
+
+colnames(all_nor_filter) <- c('Transcript_ID','Gene_stable_ID','Percent', 'Length','V5', 'V6', 'V7','V8','V9','V10','e-value','V12','V13')
+all_nor_filter$V13 <- NULL
+head(all_nor_filter)
+
+all_flo_sort<-all_flor [order(all_flor$V11,-all_flor$V3),]
+all_flo_filter<-all_flo_sort %>% group_by (all_flo_sort$V1) %>% filter (row_number()==1) %>% as.data.frame()
+nrow(all_flo_filter) #78037
+head(all_flo_filter)
+all_flo_filter$`all_flo_sort$V1` <- NULL
+
+colnames(all_flo_filter) <- c('Transcript_ID','Gene_stable_ID','Percent', 'Length','V5', 'V6', 'V7','V8','V9','V10','e-value','V12')
+head(all_flo_filter)
+
+head(ensemb_gene)
+
+nor_final<-merge(all_nor_filter, ensemb_gene,  by.x='Gene_stable_ID', all=T)
+head(nor_final)
+nor_final<-nor_final [order(nor_final$Transcript_ID),] 
+nor_final2<-nor_final %>% filter(!is.na(Transcript_ID)) %>% group_by (Transcript_ID) %>% filter (row_number()==1) %>% as.data.frame()
+nrow(nor_final2)
+head(nor_final2)
+write.table(nor_final2, file="all_north-zebra-oreo-uniprot-geneID.txt", sep='\t')
+
+flo_final<-merge(all_flo_filter, ensemb_gene,  by.x='Gene_stable_ID', all=T)
+head(flo_final)
+flo_final<-flo_final [order(flo_final$Transcript_ID),] 
+flo_final2<-flo_final %>% filter(!is.na(Transcript_ID)) %>% group_by (Transcript_ID) %>% filter (row_number()==1) %>% as.data.frame()
+nrow(flo_final2)
+head(flo_final2)
+write.table(flo_final2, file="all_florida-zebra-oreo-uniprot-geneID.txt", sep='\t')
+
+###########
+###########
+
+#### Gene Ontology (GO) annotation
+
+library(dplyr)
+setwd('~/Desktop/large-mouth-bass/LMB-annotation-feb2022/')
+
+oreoref<-read.csv('nile-tilapia-raw-GOcats.csv', header=T)
+zebraref<-read.csv('zebrafish-raw-GOannot.csv', header=T)
+unip_FL<- read.table ('Florida-Uniprot-GO-ID.txt', header=T, sep='\t')
+  colnames(unip_FL) <- c("Gene_stable_ID","GO_term_accession") 
+unip_NO<- read.table ('North-Uniprot-GO-ID.txt', header=T, sep='\t')
+  colnames(unip_NO) <- c("Gene_stable_ID","GO_term_accession")  
+
+head(unip_FL)
+head(unip_NO)
+head(oreoref)
+head(zebraref)
+
+oreoref2<-oreoref %>% group_by (Gene_stable_ID) %>% summarize(GO_term_accession=paste(unique(GO_term_accession),collapse=";")) %>% as.data.frame()
+head(oreoref2)
+nrow(oreoref2)
+write.table (oreoref2, file="nile-tilapia-GO-final.txt", sep='\t', quote=FALSE)
+
+zebraref2<-zebraref %>% group_by (Gene_stable_ID) %>% summarize(GO_term_accession=paste(unique(GO_term_accession),collapse=";")) %>% as.data.frame()
+head(zebraref2)
+nrow(zebraref2)
+write.table (zebraref2, file="zebrafish-GO-final.txt", sep='\t', quote=FALSE)
+
+Fall_GO_annot <- rbind(oreoref2, zebraref2, unip_FL)
+Nall_GO_annot <- rbind(oreoref2, zebraref2, unip_NO)
+head(Fall_GO_annot)
+head(Nall_GO_annot)
+
+write.table (Fall_GO_annot, file="FLO-LMB-all-GOcats.txt", sep='\t', quote=FALSE)
+write.table (Nall_GO_annot, file="NOR-LMB-all-GOcats.txt", sep='\t', quote=FALSE)
+
+### GO terms
+flo<- read.table ('all_florida-zebra-oreo-uniprot-geneID.txt', header=T, sep='\t')
+  head(flo)
+  flo_go_final<-merge(Fall_GO_annot, flo, by='Gene_stable_ID')
+  head(flo_go_final)
+  write.table (flo_go_final, file="FLO-LMB-GOcats-trinity-ID.txt", sep='\t', quote=FALSE) #this is tirnity ID but the reads are using the ISOGROUP ID
+ 
+nor<- read.table ('all_north-zebra-oreo-uniprot-geneID.txt', header=T, sep='\t')
+  head(nor)  
+  nor_go_final<-merge(Nall_GO_annot, nor, by='Gene_stable_ID')
+  head(nor_go_final)
+  write.table (nor_go_final, file="NOR-LMB-GOcats-trinity-ID.txt", sep='\t', quote=FALSE) #this is tirnity ID but the reads are using the ISOGROUP ID
+
+x<- read.table("Florida-trinity_iso_seq2iso.tab", header=FALSE, sep='\t')
+    colnames(x) <- c("Transcript_ID","Isogroup") 
+    head(x)
+xx<- read.table("FLO-LMB-GOcats-trinity-ID.txt", header=TRUE, sep='\t')
+  head (xx)
+GOxx<- merge (xx, x, by="Transcript_ID")
+  head(GOxx)   
+  GOxx2<- GOxx[ , c("Isogroup","GO_term_accession")] 
+  nrow(GOxx2) #69464
+  GOxx3<- unique(GOxx2)
+  nrow(GOxx3) #37652
+  write.table(GOxx3, file="Flo-GO-final.txt", sep='\t', quote=FALSE)
+  
+y<- read.table("North-trinity_iso_seq2iso.tab", header=FALSE, sep='\t')
+    colnames(y) <- c("Transcript_ID","Isogroup") 
+    head(y)
+yy<-read.table("NOR-LMB-GOcats-trinity-ID.txt", header=TRUE, sep='\t')    
+    head(yy)
+
+GOyy<- merge (yy, y, by="Transcript_ID")
+    head(GOyy)   
+    GOyy2<- GOyy[ , c("Isogroup","GO_term_accession")] 
+    nrow(GOyy2) #71377
+    GOyy3<- unique(GOyy2)
+    nrow(GOyy3) #38221
+    write.table(GOyy3, file="NOR-GO-final.txt", sep='\t', quote=FALSE)
+    
