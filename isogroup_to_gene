@@ -1,0 +1,68 @@
+#### script used to match isogroups from the transcriptome with the gene names into a single table
+
+setwd('~/Desktop/large-mouth-bass/LMB-annotation-feb2022/')
+library(dplyr)
+flo<-read.table("all_florida-zebra-oreo-uniprot-geneID.txt", sep='\t', header=T)
+head(flo)
+nrow(flo)
+nor<-read.table ("all_north-zebra-oreo-uniprot-geneID.txt", sep='\t', header=T)
+nrow(nor)
+
+flo_iso<-read.table("Florida-trinity_iso_seq2iso.tab", header=T, sep='\t' )
+head(flo_iso)
+nrow(flo_iso)
+nor_iso<-read.table("North-trinity_iso_seq2iso.tab", header=T, sep='\t' )
+head(nor_iso)
+
+xx<-merge(flo, flo_iso, by="Transcript_ID")
+head(xx)
+nrow(xx)
+xx2<- xx %>% group_by(isogroup) %>% arrange(desc(Percent)) %>% filter(row_number()==1)  %>% as.data.frame()
+head(xx2)
+nrow(xx2)# 39706
+write.table(xx2, "Florida_iso_gene_final.txt", quote=F, sep='\t')
+
+
+yy<-merge(nor, nor_iso, by="Transcript_ID")
+nrow(yy)
+yy2<- yy %>% group_by(isogroup) %>% arrange(desc(Percent)) %>% filter(row_number()==1)  %>% as.data.frame()
+head(yy2)
+nrow(yy2)# 40406
+write.table(yy2, "North_iso_gene_final.txt", quote=F, sep='\t')
+
+
+#### to annotate the gene tables, the resulting files were manually edited in excel
+
+#script for annotation of genes
+##FLorida
+setwd('~/Desktop/large-mouth-bass/gene-expression/florida/')
+w<-read.table("~/Desktop/large-mouth-bass/LMB-annotation-feb2022/Florida_iso_gene_final.txt", header=TRUE, sep='\t')
+head(w)
+files <- list.files(pattern="*-sig.csv", full.names=TRUE, recursive=FALSE)
+files
+#make sure that the headers match
+
+lapply(files, function(x) {
+  y <- read.csv(x, header=TRUE, sep=',') # load file
+  # apply function
+  out <- merge(w, y, by.w="isogroup")
+  # write to file
+  write.csv(out, file=paste(x,"_merged.csv"), quote=TRUE, row.names=FALSE, col.names=TRUE)
+}) #this generates the merged files, the name of the files is not great needs to be edited further
+
+
+##North 
+setwd('~/Desktop/large-mouth-bass/gene-expression/north/')
+w<-read.table("~/Desktop/large-mouth-bass/LMB-annotation-feb2022/North_iso_gene_final.txt", header=TRUE, sep='\t')
+head(w)
+files <- list.files(pattern="*-sig.csv", full.names=TRUE, recursive=FALSE)
+files
+#make sure that the headers match
+
+lapply(files, function(x) {
+  y <- read.csv(x, header=TRUE, sep=',') # load file
+  # apply function
+  out <- merge(w, y, by.w="isogroup")
+  # write to file
+  write.csv(out, file=paste(x,"_merged.csv"), quote=TRUE, row.names=FALSE, col.names=TRUE)
+}) 
