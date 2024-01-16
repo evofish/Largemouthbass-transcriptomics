@@ -1,0 +1,224 @@
+setwd('~/Desktop/large-mouth-bass/gene-expression/')
+library('DESeq2')
+library('pheatmap')
+library('RColorBrewer')
+library('ggplot2')
+
+#read file
+x <- read.table('Florida-allcounts-final.txt', row.names = "Geneid", header=TRUE, sep = "\t")
+x<-as.matrix(x)
+#rownames(countData) = make.names("Geneid", unique=TRUE)
+head(x)
+ncol(x)  
+
+#this is the traits file, it was changed so the values are not just numbers. DESEQ treats numbers differently in the statistical design
+metaData <- read.csv('Florida-attributes-table-Nov2021.csv', header = TRUE, sep = ",", row.names = "Sample") 
+head(metaData)
+nrow(metaData)
+
+#to see the total counts per sample, and report the range
+totalCounts=colSums(x) 
+
+totalCounts
+min(totalCounts) #527797
+max(totalCounts) #2921704
+mean(totalCounts) #1142347
+
+#to make sure the names on the attributes table is the same as count table. Should say TRUE
+all(rownames(metaData) %in% colnames(x))
+
+#######
+#Effect of Temperature + Age combined extracting effect of tank
+dds <- DESeqDataSetFromMatrix(countData=x,
+                                colData=metaData,
+                                design=~Temperature+Age+Tank )
+dds <- DESeq(dds, test="LRT", reduced=~Tank)  
+res <-results(dds)
+write.csv(res, file="Florida-Temp+Age-LRT-table4GO.csv", quote=FALSE) #genes that are different just due to temperature
+table(res$padj<0.01)
+#FALSE  TRUE 
+#43802  9231 True= number of DEF for all categories
+
+#showing the top x values (head) of table
+head(results(dds, tidy=TRUE))
+summary(res)
+res <- res[order(res$padj),]
+head(res)
+  
+par(mfrow=c(1,1))
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-3,3)))
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+  
+vsdata <- vst(dds, blind=FALSE)
+  
+plotPCA(vsdata, intgroup="Temperature") #effect of just temperature 
+
+##sample to sample distance clustering
+head(res)
+vsd=getVarianceStabilizedData(dds)
+head(vsd)
+head(res)
+vals=cbind(res$pvalue, res$padj)
+head(vals)
+colnames(vals)=c("pval", "padj")
+vsdpvals=cbind(vsd,vals)
+head(vsdpvals)
+write.csv(vsdpvals,"Florida-all-LRT_VSDandPVALS_2021.csv", quote=F)
+
+sampleDists <- dist(t(vsd))
+as.matrix(vsdata)
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(colnames(vsdata))
+colnames(sampleDistMatrix) <- paste(colnames(vsdata))
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(250)
+pheatmap(sampleDistMatrix,
+         clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists,
+         col=colors)
+
+######  
+#####effect of just Temperature 
+8
+#41235  7651  
+
+#summary of results
+summary(res)
+res <- res[order(res$padj),]
+head(res)
+
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-3,3)))
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+
+#First we need to transform the raw count data
+#vst function will perform variance stabilizing transformation
+vsdata <- vst(dds, blind=FALSE)
+
+#using the DESEQ2 plotPCA fxn we can
+plotPCA(vsdata, intgroup="Temperature")
+
+#Pairwise comparisons controlling by age
+
+
+#####
+#Effect of just Age 
+dds <- DESeqDataSetFromMatrix(countData=x,colData=metaData, design=~Temperature+Age+Tank)  
+dds <- DESeq(dds, test="LRT", reduced=~Temperature+Tank)  
+res <-results(dds)
+write.csv(res, file="Florida-Age-LRT-table4GO.csv", quote=FALSE) #genes that are different just due to temperature
+table(res$padj<0.01)
+#FALSE  TRUE 
+#25592   488 
+
+#summary of results
+summary(res)
+res <- res[order(res$padj),]
+head(res)
+
+par(mfrow=c(1,1))
+# Make a basic volcano plot
+with(res, plot(log2FoldChange, -log10(pvalue), pch=20, main="Volcano plot", xlim=c(-3,3)))
+# Add colored points: blue if padj<0.01, red if log2FC>1 and padj<0.05)
+with(subset(res, padj<.01 ), points(log2FoldChange, -log10(pvalue), pch=20, col="blue"))
+with(subset(res, padj<.01 & abs(log2FoldChange)>2), points(log2FoldChange, -log10(pvalue), pch=20, col="red"))
+
+#First we need to transform the raw count data
+#vst function will perform variance stabilizing transformation
+vsdata <- vst(dds, blind=FALSE)
+
+#using the DESEQ2 plotPCA fxn we can
+plotPCA(vsdata, intgroup="Age")
+
+######
+#effect of just tank 
+dds <- DESeqDataSetFromMatrix(countData=x,colData=metaData, design=~Temperature+Age+Tank)  
+dds <- DESeq(dds, test="LRT", reduced=~Temperature+Age)  
+res <-results(dds)
+write.csv(res, file="Florida-Tank-LRT-table4GO.csv", quote=FALSE) #genes that are different just due to temperature
+table(res$padj<0.01)
+#FALSE  TRUE 
+#13606    34
+
+######
+## For pairwise contrast redo DESEQ by condition (individual condition of each sample) correcting for tank effects
+dds <- DESeqDataSetFromMatrix(countData=x,colData=metaData, design=~Condition)  
+dds <- DESeq(dds)  
+res <-results(dds)
+write.csv(res, file="Florida-ConditionMinusTankEffect-LRT-table4GO.csv", quote=FALSE) #genes that are different just due to temperature
+table(res$padj<0.01)
+#FALSE  TRUE 
+#106703 237 genes that are different based on the specific individual conditions 
+
+vsdata <- vst(dds, blind=FALSE)
+pcdata<-plotPCA(vsdata, intgroup="Condition", returnData = TRUE ) #effect of individual traits
+pcdata
+ggplot(pcdata, aes(x = PC1,y = PC2,color = Condition)) + geom_point(shape=15, size=3)+ theme_bw()
+
+
+##Pairwise contrasts by individual condition For 8 day samples
+#21C_8d vs 24C_8d
+res.vs<-results(dds, contrast=c('Condition', '21C_8d', '24C_8d')) #here is where the two contrasting conditions get defined
+write.csv(res.vs, file="21C_8d-24C_8d-res-table4GO.csv", quote=FALSE)
+mcols(res.vs,use.names=TRUE)
+table(res.vs$padj<0.01) 
+#FALSE  TRUE 
+#22080  1927 THIS IS WAY TOO HIGH
+sigs<-res.vs[which(res.vs$padj<0.01),] #this command is only to write the table, use sig=which(res$padj<0.05) for heatmap
+write.csv(sigs, file='21C_8d-24C_8d-sig.csv')
+
+#21C_8d vs 27C_8d
+res.vs<-results(dds, contrast=c('Condition', '21C_8d', '27C_8d')) #here is where the two contrasting conditions get defined
+write.csv(res.vs, file="21C_8d-27C_8d-res-table4GO.csv", quote=FALSE)
+mcols(res.vs,use.names=TRUE)
+table(res.vs$padj<0.01) 
+#FALSE  TRUE 
+#31921  2453 THIS IS WAY TOO HIGH  
+sigs<-res.vs[which(res.vs$padj<0.01),] #this command is only to write the table, use sig=which(res$padj<0.05) for heatmap
+write.csv(sigs, file='21C_8d-27C_8d-sig.csv')
+
+#24C_8d vs 27C_8d
+res<-results(dds, contrast=c('Condition', '24C_8d', '27C_8d')) #here is where the two contrasting conditions get defined
+write.csv(res, file="24C_8d-27C_8d-res-table4GO.csv", quote=FALSE)
+mcols(res,use.names=TRUE)
+table(res$padj<0.01) 
+#FALSE  TRUE 
+#21813   121 
+sigs<-res[which(res$padj<0.01),] #this command is only to write the table, use sig=which(res$padj<0.05) for heatmap
+write.csv(sigs, file='24C_8d-27C_8d-sig.csv')
+
+##Pairwise contrasts by individual condition 28 days contrast 
+#21C_28d vs 24C_28d
+res.vs<-results(dds, contrast=c('Condition', '21C_28d', '24C_28d')) #here is where the two contrasting conditions get defined
+write.csv(res.vs, file="21C_28d-24C_28d-res-table4GO.csv", quote=FALSE)
+mcols(res.vs,use.names=TRUE)
+table(res.vs$padj<0.01) 
+#FALSE  TRUE 
+#23849   158
+sigs<-res.vs[which(res.vs$padj<0.01),] #this command is only to write the table, use sig=which(res$padj<0.05) for heatmap
+write.csv(sigs, file='21C_28d-24C_28d-sig.csv')
+
+#21C_28d vs 27C_28d
+res.vs<-results(dds, contrast=c('Condition', '21C_28d', '27C_28d')) #here is where the two contrasting conditions get defined
+write.csv(res.vs, file="21C_28d-27C_28d-res-table4GO.csv", quote=FALSE)
+mcols(res.vs,use.names=TRUE)
+table(res.vs$padj<0.01) 
+#FALSE  TRUE 
+#43129  7831
+sigs<-res.vs[which(res.vs$padj<0.01),] #this command is only to write the table, use sig=which(res$padj<0.05) for heatmap
+write.csv(sigs, file='21C_28d-27C_28d-sig.csv')
+
+#24C_28d vs 27C_28d
+res.vs<-results(dds, contrast=c('Condition', '24C_28d', '27C_28d')) #here is where the two contrasting conditions get defined
+write.csv(res.vs, file="24C_28d-27C_28d-res-table4GO.csv", quote=FALSE)
+mcols(res.vs,use.names=TRUE)
+table(res.vs$padj<0.01) 
+#FALSE  TRUE 
+#45088  3799
+sigs<-res.vs[which(res.vs$padj<0.01),] #this command is only to write the table, use sig=which(res$padj<0.05) for heatmap
+write.csv(sigs, file='24C_28d-27C_28d-sig.csv')
+
+
