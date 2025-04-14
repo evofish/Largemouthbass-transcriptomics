@@ -1,0 +1,44 @@
+When doing tagseq, it is important to remember that the program Transdecoder can remove the Poly-A tail of the reference transcriptome, which will reduce the mapping rates of the tagseq reads. The main way to summarize the number of contigs is with CD-hit (which collapses contigs based on similarity).
+
+Examples on how to run the scripts available at: https://github.com/z0on/tag-based_RNAseq/tree/master
+The programs in PERL should be installed to your local supercomputer. 
+
+Step #1 RNAseq clipper
+#!/bin/bash
+#find what module you need to load by searching for the program name on hpcdocs$
+source /opt/asn/etc/asn-bash-profiles-special/modules.sh
+module load anaconda/3-2020.02
+tag-based_RNAseq/tagseq_clipper.pl 10_S143_combined.fastq | cutadapt - -a AAAAAAAA -a AGATCGG -q 15 -m 25 -o 10_S143_combined.trim
+tag-based_RNAseq/tagseq_clipper.pl 11_S151_combined.fastq | cutadapt - -a AAAAAAAA -a AGATCGG -q 15 -m 25 -o 11_S151_combined.trim
+tag-based_RNAseq/tagseq_clipper.pl 12_S159_combined.fastq | cutadapt - -a AAAAAAAA -a AGATCGG -q 15 -m 25 -o 12_S159_combined.trim
+tag-based_RNAseq/tagseq_clipper.pl 13_S72_combined.fastq | cutadapt - -a AAAAAAAA -a AGATCGG -q 15 -m 25 -o 13_S72_combined.trim
+tag-based_RNAseq/tagseq_clipper.pl 14_S80_combined.fastq | cutadapt - -a AAAAAAAA -a AGATCGG -q 15 -m 25 -o 14_S80_combined.trim
+tag-based_RNAseq/tagseq_clipper.pl 15_S88_combined.fastq | cutadapt - -a AAAAAAAA -a AGATCGG -q 15 -m 25 -o 15_S88_combined.trim
+tag-based_RNAseq/tagseq_clipper.pl 16_S96_combined.fastq | cutadapt - -a AAAAAAAA -a AGATCGG -q 15 -m 25 -o 16_S96_combined.trim
+tag-based_RNAseq/tagseq_clipper.pl 17_S104_combined.fastq | cutadapt - -a AAAAAAAA -a AGATCGG -q 15 -m 25 -o 17_S104_combined.trim
+tag-based_RNAseq/tagseq_clipper.pl 18_S112_combined.fastq | cutadapt - -a AAAAAAAA -a AGATCGG -q 15 -m 25 -o 18_S112_combined.trim
+
+
+Step#2 Bowtie 
+
+#!/bin/bash
+source /opt/asn/etc/asn-bash-profiles-special/modules.sh
+module load bowtie2/2.2.9
+# place bowtie2 commands after this line
+bowtie2 --local -x ../../transcriptome/final_transcriptomes/FLORIDA/trinity.Trinity.fasta -U 31_S121_combined.trim -S 31_S121_combined.trim.sam --no-hd --no-sq --no-$
+bowtie2 --local -x ../../transcriptome/final_transcriptomes/FLORIDA/trinity.Trinity.fasta -U 34_S145_combined.trim -S 34_S145_combined.trim.sam --no-hd --no-sq --no-$
+bowtie2 --local -x ../../transcriptome/final_transcriptomes/FLORIDA/trinity.Trinity.fasta -U 1_S71_combined.trim -S 1_S71_combined.trim.sam --no-hd --no-sq --no-unal$
+
+Step #3 Samcount.pl 
+
+#!/bin/bash
+../tag-based_RNAseq/samcount.pl 28_S97_combined.trim.sam /home/aubmab/lmb/transcriptome/final_transcriptomes/FLORIDA/trinity_iso_seq2iso.tab aligner=bowtie2 >28_S97_$
+../tag-based_RNAseq/samcount.pl 6_S111_combined.trim.sam /home/aubmab/lmb/transcriptome/final_transcriptomes/FLORIDA/trinity_iso_seq2iso.tab aligner=bowtie2 >6_S111_$
+../tag-based_RNAseq/samcount.pl 17_S104_combined.trim.sam /home/aubmab/lmb/transcriptome/final_transcriptomes/FLORIDA/trinity_iso_seq2iso.tab aligner=bowtie2 >17_S10$
+../tag-based_RNAseq/samcount.pl 22_S144_combined.trim.sam /home/aubmab/lmb/transcriptome/final_transcriptomes/FLORIDA/trinity_iso_seq2iso.tab aligner=bowtie2 >22_S14$
+../tag-based_RNAseq/samcount.pl 23_S152_combined.trim.sam /home/aubmab/lmb/transcriptome/final_transcriptomes/FLORIDA/trinity_iso_seq2iso.tab aligner=bowtie2 >23_S15$
+
+
+Step #4 Count compiler 
+#!/bin/bash
+../tag-based_RNAseq/expression_compiler.pl *.sam.counts > Florida-allcounts.txt
